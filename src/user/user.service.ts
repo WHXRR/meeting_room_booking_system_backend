@@ -15,6 +15,8 @@ import { Role } from './entities/role.entity';
 import { Permission } from './entities/permission.entity';
 import { LoginUserDto } from './dto/login-user.dto';
 import { LoginUserVo } from './vo/login-user.vo';
+import { UpdateUserPasswordDto } from './dto/update-user-password.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UserService {
@@ -168,5 +170,76 @@ export class UserService {
         return arr;
       }, []),
     };
+  }
+
+  async findUserDetailById(userId: number) {
+    const user = await this.userRepository.findOne({
+      where: {
+        id: userId,
+      },
+    });
+    return user;
+  }
+
+  async updatePassword(userId: number, passwordDto: UpdateUserPasswordDto) {
+    const user = await this.userRepository.findOneBy({
+      id: userId,
+    });
+    const captcha = await this.redisService.get(
+      `update_password_captcha_${user.email}`,
+    );
+    if (!captcha) {
+      throw new HttpException('验证码已失效', HttpStatus.BAD_REQUEST);
+    }
+
+    if (passwordDto.captcha !== captcha) {
+      throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
+    }
+
+    const findUser = await this.userRepository.findOneBy({
+      id: userId,
+    });
+
+    findUser.password = md5(passwordDto.password);
+
+    try {
+      await this.userRepository.save(findUser);
+      return '修改成功';
+    } catch (e) {
+      this.logger.error(e, UserService);
+      return '修改失败';
+    }
+  }
+
+  async update(userId: number, updateUserDto: UpdateUserDto) {
+    const user = await this.userRepository.findOneBy({
+      id: userId,
+    });
+    const captcha = await this.redisService.get(`update_captcha_${user.email}`);
+
+    if (!captcha) {
+      throw new HttpException('验证码已失效', HttpStatus.BAD_REQUEST);
+    }
+
+    if (updateUserDto.captcha !== captcha) {
+      throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
+    }
+
+    const findUser = await this.userRepository.findOneBy({
+      id: userId,
+    });
+    if (updateUserDto.nickName) {
+      findUser.nickName = updateUserDto.nickName;
+    }
+    if (updateUserDto.headPic) {
+      findUser.headPic = updateUserDto.headPic;
+    }
+    try {
+      await this.userRepository.save(findUser);
+      return '修改成功';
+    } catch (e) {
+      this.logger.error(e, UserService);
+      return '修改失败';
+    }
   }
 }

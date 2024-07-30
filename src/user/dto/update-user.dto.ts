@@ -1,0 +1,11 @@
+import { IsNotEmpty } from 'class-validator';
+
+export class UpdateUserDto {
+  headPic: string;
+  nickName: string;
+
+  @IsNotEmpty({
+    message: '验证码不能为空',
+  })
+  captcha: string;
+}
