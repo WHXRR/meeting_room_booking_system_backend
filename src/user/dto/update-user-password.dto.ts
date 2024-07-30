@@ -1,6 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, MinLength } from 'class-validator';
 
 export class UpdateUserPasswordDto {
+  @ApiProperty()
   @IsNotEmpty({
     message: '密码不能为空',
   })
@@ -9,6 +11,7 @@ export class UpdateUserPasswordDto {
   })
   password: string;
 
+  @ApiProperty()
   @IsNotEmpty({
     message: '验证码不能为空',
   })

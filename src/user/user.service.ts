@@ -8,7 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { RegisterUserDto } from './dto/register-user.dto';
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 import { RedisService } from 'src/redis/redis.service';
 import { md5 } from 'src/utils';
 import { Role } from './entities/role.entity';
@@ -17,6 +17,7 @@ import { LoginUserDto } from './dto/login-user.dto';
 import { LoginUserVo } from './vo/login-user.vo';
 import { UpdateUserPasswordDto } from './dto/update-user-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserListVo } from './vo/user-list.vo';
 
 @Injectable()
 export class UserService {
@@ -267,13 +268,13 @@ export class UserService {
     const skipCount = (pageNo - 1) * pageSize;
     const condition: Record<string, any> = {};
     if (username) {
-      condition.username = username;
+      condition.username = Like(`%${username}%`);
     }
     if (nickName) {
-      condition.nickName = nickName;
+      condition.nickName = Like(`%${nickName}%`);
     }
     if (email) {
-      condition.email = email;
+      condition.email = Like(`%${email}%`);
     }
     const [users, totalCount] = await this.userRepository.findAndCount({
       select: [
@@ -290,9 +291,10 @@ export class UserService {
       take: pageSize,
       where: condition,
     });
-    return {
-      users,
-      totalCount,
-    };
+    const vo = new UserListVo();
+
+    vo.users = users;
+    vo.totalCount = totalCount;
+    return vo;
   }
 }
