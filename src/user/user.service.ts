@@ -159,6 +159,7 @@ export class UserService {
     });
     return {
       id: user.id,
+      email: user.email,
       username: user.username,
       isAdmin: user.isAdmin,
       roles: user.roles.map((item) => item.name),
@@ -182,12 +183,9 @@ export class UserService {
     return user;
   }
 
-  async updatePassword(userId: number, passwordDto: UpdateUserPasswordDto) {
-    const user = await this.userRepository.findOneBy({
-      id: userId,
-    });
+  async updatePassword(passwordDto: UpdateUserPasswordDto) {
     const captcha = await this.redisService.get(
-      `update_password_captcha_${user.email}`,
+      `update_password_captcha_${passwordDto.email}`,
     );
     if (!captcha) {
       throw new HttpException('验证码已失效', HttpStatus.BAD_REQUEST);
@@ -197,14 +195,17 @@ export class UserService {
       throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
     }
 
-    const findUser = await this.userRepository.findOneBy({
-      id: userId,
+    const user = await this.userRepository.findOneBy({
+      username: passwordDto.username,
     });
+    if (user.email !== passwordDto.email) {
+      throw new HttpException('邮箱错误', HttpStatus.BAD_REQUEST);
+    }
 
-    findUser.password = md5(passwordDto.password);
+    user.password = md5(passwordDto.password);
 
     try {
-      await this.userRepository.save(findUser);
+      await this.userRepository.save(user);
       return '修改成功';
     } catch (e) {
       this.logger.error(e, UserService);

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -8,6 +9,8 @@ import {
   Post,
   Query,
   UnauthorizedException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -30,6 +33,9 @@ import {
 } from '@nestjs/swagger';
 import { LoginUserVo } from './vo/login-user.vo';
 import { RefreshTokenVo } from './vo/refresh-token.vo';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as path from 'path';
+import { storage } from 'src/my-file-storage';
 
 @ApiTags('用户模块')
 @Controller('user')
@@ -115,6 +121,7 @@ export class UserController {
       {
         userId: vo.userInfo.id,
         username: vo.userInfo.username,
+        email: vo.userInfo.email,
         roles: vo.userInfo.roles,
         permissions: vo.userInfo.permissions,
       },
@@ -155,6 +162,7 @@ export class UserController {
       {
         userId: vo.userInfo.id,
         username: vo.userInfo.username,
+        email: vo.userInfo.email,
         roles: vo.userInfo.roles,
         permissions: vo.userInfo.permissions,
       },
@@ -201,6 +209,7 @@ export class UserController {
         {
           userId: user.id,
           username: user.username,
+          email: user.email,
           roles: user.roles,
           permissions: user.permissions,
         },
@@ -255,6 +264,7 @@ export class UserController {
         {
           userId: user.id,
           username: user.username,
+          email: user.email,
           roles: user.roles,
           permissions: user.permissions,
         },
@@ -305,44 +315,33 @@ export class UserController {
     return vo;
   }
 
-  @ApiBearerAuth()
   @ApiResponse({
     type: String,
     description: '发送成功',
   })
-  @RequireLogin()
   @Get('update_password/captcha')
-  async updatePasswordCaptcha(@UserInfo('userId') userId: number) {
+  async updatePasswordCaptcha(@Query('address') address: string) {
     const code = Math.random().toString().slice(2, 8);
-
-    const user = await this.userService.findUserDetailById(userId);
-
     await this.redisService.set(
-      `update_password_captcha_${user.email}`,
+      `update_password_captcha_${address}`,
       code,
       10 * 60,
     );
-
     await this.emailService.sendMail({
-      to: user.email,
+      to: address,
       subject: '更改密码验证码',
       html: `<p>你的验证码是：${code}</p>`,
     });
     return '发送成功';
   }
 
-  @ApiBearerAuth()
   @ApiResponse({
     type: String,
     description: '验证码已失效/不正确',
   })
   @Post(['update_password', 'admin/update_password'])
-  @RequireLogin()
-  async updatePassword(
-    @UserInfo('userId') userId: number,
-    @Body() passwordDto: UpdateUserPasswordDto,
-  ) {
-    return await this.userService.updatePassword(userId, passwordDto);
+  async updatePassword(@Body() passwordDto: UpdateUserPasswordDto) {
+    return await this.userService.updatePassword(passwordDto);
   }
 
   @ApiBearerAuth()
@@ -352,15 +351,13 @@ export class UserController {
   })
   @Get('update/captcha')
   @RequireLogin()
-  async updateCaptcha(@UserInfo('userId') userId: number) {
+  async updateCaptcha(@UserInfo('email') address: string) {
     const code = Math.random().toString().slice(2, 8);
 
-    const user = await this.userService.findUserDetailById(userId);
-
-    await this.redisService.set(`update_captcha_${user.email}`, code, 10 * 60);
+    await this.redisService.set(`update_captcha_${address}`, code, 10 * 60);
 
     await this.emailService.sendMail({
-      to: user.email,
+      to: address,
       subject: '更改个人信息验证码',
       html: `<p>你的验证码是：${code}</p>`,
     });
@@ -458,5 +455,27 @@ export class UserController {
       nickName,
       email,
     );
+  }
+
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      dest: 'uploads',
+      limits: {
+        fileSize: 3 * 1024 * 1024,
+      },
+      storage: storage,
+      fileFilter(req, file, cb) {
+        const extname = path.extname(file.originalname);
+        if (['png, ', '.jpg', '.jpeg', '.gif'].includes(extname)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('不是图片文件'), false);
+        }
+      },
+    }),
+  )
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    return file.path;
   }
 }
