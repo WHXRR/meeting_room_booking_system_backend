@@ -4,6 +4,7 @@ import { MeetingRoom } from './entities/meeting-room.entity';
 import { EntityManager, Like, Repository } from 'typeorm';
 import { CreateMeetingRoomDto } from './dto/create-meeting-room.dto';
 import { UpdateMeetingRoomDto } from './dto/update-meeting-room.dto';
+import { Booking } from 'src/booking/entities/booking.entity';
 
 @Injectable()
 export class MeetingRoomService {
@@ -111,17 +112,15 @@ export class MeetingRoomService {
   @InjectEntityManager()
   entityManager: EntityManager;
   async delete(id: number) {
-    // const bookings = await this.entityManager.findBy(Booking, {
-    //   room: {
-    //     id,
-    //   },
-    // });
-    // for (let i = 0; i < bookings.length; i++) {
-    //   this.entityManager.delete(Booking, bookings[i].id);
-    // }
-    const room = await this.repository.findOneBy({ id });
-    if (!room) {
-      throw new BadRequestException('会议室不存在');
+    const bookings = await this.entityManager.findBy(Booking, {
+      room: {
+        id,
+      },
+    });
+    console.log(bookings, 'bookings');
+
+    for (let i = 0; i < bookings.length; i++) {
+      this.entityManager.delete(Booking, bookings[i].id);
     }
     await this.repository.delete(id);
     return 'success';
